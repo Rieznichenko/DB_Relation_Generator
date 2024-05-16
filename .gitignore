@@ -1,0 +1,9 @@
+/.venv
+/data
+.env
+domain.json
+email.json
+file.json
+ip.json
+relations.json
+__pycache__
