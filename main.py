@@ -20,9 +20,9 @@ def main():
     relationship = Relationship(args=args)
     
     # Generate & Store Dummy Data
-    dummy_data = relationship.generate_random_data(10000)
-    relationship.save_to_json(dummy_data)
-    relationship.insert_to_mongodb(10000)
+    # dummy_data = relationship.generate_random_data(10000)
+    # relationship.save_to_json(dummy_data)
+    # relationship.insert_to_mongodb(10000)
     
     relationship.dfs75()
 
