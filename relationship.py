@@ -5,16 +5,47 @@ from collections import deque
 import json
 import random
 import uuid
+import copy
+from bson.objectid import ObjectId
+import sys
 
+sys.setrecursionlimit(200000)
 class Relationship:
     def __init__(self, args):
-        self.chunk_size = 10000
-
+        self.chunk_size = 1
+        self.count = 0
         # MongoDB configuration
         self.mongo_uri = f"mongodb://{args.mongo_host}:{args.mongo_port}"
         self.mongo_db = args.mongo_db
         self.mongo_dummy_collection = args.mongo_dummy_collection
         self.mongo_relation_collection = args.mongo_relation_collection
+
+        client = MongoClient(self.mongo_uri)
+        db = client[self.mongo_db]
+        collection = db[self.mongo_dummy_collection]
+        self.data = self.convert_objectid(list(collection.find()))
+
+        self.link = {}
+        self.vis = {}
+        self.mp = {}
+        for i in range(0, 3):
+            self.link[i] = {}
+
+        for d in self.data:
+            self.mp[d['id']] = d
+            self.link[0][d['id']] = []
+            self.link[1][d['id']] = []
+            self.link[2][d['id']] = []
+
+            if d["ip_address"] is not None:
+                self.link[0][d['id']] = self.convert_objectid(list(collection.find({"ip_address": d["ip_address"]})))
+            if d["domain"] is not None:
+                self.link[1][d['id']] = self.convert_objectid(list(collection.find({"domain_name": d["domain"]})))
+            if d["sha256"] is not None:
+                self.link[2][d['id']] = self.convert_objectid(list(collection.find({"file_hash": d["sha256"]})))
+
+            self.vis[d['id']] = 0
+        print("Init data successfully")
 
     def generate_random_data(self, count):
         data = []
@@ -80,34 +111,53 @@ class Relationship:
             # Perform bulk_write
             collection.bulk_write(operations)
 
-    def generate_relation(self, parent_ip=None, parent_domain=None, parent_file=None):
-        client = MongoClient(self.mongo_uri)
-        db = client[self.mongo_db]
-        collection = db[self.mongo_dummy_collection]
-        
-        # read data from MongoDB
-        data = list(collection.find())
-        
-        for d in data:
-            if 'ip_address' in d and d['ip_address'] != parent_ip:
-                ip_relation = collection.find({"ip_address": d["ip_address"]})
-                d["ip_relation"] = [i for i in ip_relation if i["id"] != d["id"]]
-                
-            if 'domain_name' in d and d['domain_name'] != parent_domain:
-                domain_relation = collection.find({"domain_name": d["domain_name"]})
-                d["domain_relation"] = self.generate_relation([i for i in domain_relation if i["id"] != d["id"]])
-                
-            if 'file_hash' in d and d['file_hash'] != parent_file:
-                file_relation = collection.find({"file_hash": d["file_hash"]})
-                d["file_relation"] = self.generate_relation([i for i in file_relation if i["id"] != d["id"]])
+    def generate_relation(self, idx, state):
+        #if idx not in self.link[state]:  # Base case
+        #    return
+        self.count = self.count + 1
+        if count % 10000 == 0:
+            print(f'{count} relations have been generated.')
+        ret = copy.deepcopy(self.mp[idx])
 
-        # save the relation data to JSON file
+        for i in range(0, 3):
+            if state == i:
+                continue
+
+            array = []
+
+            for des in self.link[i][idx]:
+                if self.vis[des['id']] == 0:
+                    self.vis[des['id']] = 1
+                    result = self.generate_relation(des['id'], i)
+                  #  self.vis[des['id']] = 0
+
+                    array.append(result)
+
+            if len(array) > 0:
+                if i == 0:
+                    ret["ip_relation"] = array
+                elif i == 1:  
+                    ret["domain_relation"] = array
+                else:
+                    ret["file_relation"] = array
+
+        return ret
+
+    def dfs75(self):
+        self.result = []
+        print(self.data)
+        for node in self.data:
+            self.vis[node['id']] = 1
+            self.result.append(self.generate_relation(node['id'], -1))
+           # self.vis[node['id']] = 0
+
         with open('relations.json', 'w') as f:
-            json.dump(data, f)
+            json.dump(self.result, f, indent=4)
 
-        # insert the relation data to MongoDB
-        relation_collection = db[self.mongo_relation_collection]
-        operations = [UpdateOne({"id": d["id"]}, {"$set": d}, upsert=True) for d in data]
-        relation_collection.bulk_write(operations)
+        print("Finished processing all files.")
 
-        return data
+    def convert_objectid(self,docs):
+        for doc in docs:
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+        return docs
