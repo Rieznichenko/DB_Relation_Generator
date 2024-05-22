@@ -166,9 +166,13 @@ class Relationship:
     
     def insert_to_mongodb(self, data, pa_id, relation_type):
         # Create an index on id for faster lookups and updates
-       return {
+        if 'ip_address' in data:
+            ip_address = data['ip_address']
+        else:
+            ip_address = None  # or some default value
+        return {
             "id": data['_id'],
-            "ip_address": data['ip_address'],
+            "ip_address": ip_address,
             "domain": data['domain'],
             "sha256": data['sha256'],
             "pa_id": pa_id,
