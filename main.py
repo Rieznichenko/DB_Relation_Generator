@@ -24,7 +24,7 @@ def main():
     # relationship.save_to_json(dummy_data)
     # relationship.insert_to_mongodb(10000)
     
-    relationship.dfs75()
+    relationship.dothis()
 
 if __name__ == "__main__":
     main()
