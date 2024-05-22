@@ -94,9 +94,15 @@ class Relationship:
         index = 0
         for d in self.data:
             self.mp_id[d['_id']] = index
-            id1 = self.get_uid(0, d['ip_address'])
-            id2 = self.get_uid(1, d['domain'])
-            id3 = self.get_uid(2, d['sha256'])
+            id1 = -1
+            id2 = -1
+            id3 = -1
+            if 'ip_address' in d and d['ip_address']:
+                id1 = self.get_uid(0, d['ip_address'])
+            if 'domain' in d and d['domain']:
+                id2 = self.get_uid(1, d['domain'])
+            if 'sha256' in d and d['sha256']:
+                id3 = self.get_uid(2, d['sha256'])
 
             if id1 != -1:
                 self.link[0][id1].append(index)
